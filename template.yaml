@@ -1,0 +1,108 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Serverless backend for the Family Cat Photos sharing application.
+
+Globals:
+  Function:
+    Runtime: python3.11
+    Timeout: 10
+    MemorySize: 256
+    Architectures:
+      - x86_64
+    Tracing: Active
+    Environment:
+      Variables:
+        PHOTO_TABLE_NAME: !Ref PhotoMetadataTable
+        PHOTO_BUCKET_NAME: !Ref PhotoBucket
+        ALLOWED_FAMILY_IDS: !Join
+          - ","
+          - !Ref AllowedFamilyIds
+
+Parameters:
+  StageName:
+    Type: String
+    Default: dev
+    AllowedPattern: "[a-z0-9-]+"
+    Description: Deployment stage name used for API and resource naming.
+  AllowedFamilyIds:
+    Type: List<String>
+    Default: []
+    Description: >-
+      Comma separated list of family identifiers allowed to access the API. Leave empty to accept any identifier.
+
+Resources:
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: !Ref StageName
+
+  PhotoApiFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: python3.11
+    Properties:
+      CodeUri: src/handlers
+      Handler: photos.handler
+      Description: Handles API requests for managing and sharing cat photos.
+      Events:
+        ApiProxy:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Method: ANY
+            Path: /{proxy+}
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - DynamoDBCrudPolicy:
+            TableName: !Ref PhotoMetadataTable
+        - S3CrudPolicy:
+            BucketName: !Ref PhotoBucket
+
+  PhotoBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      VersioningConfiguration:
+        Status: Enabled
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+
+  PhotoMetadataTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: FamilyId
+          AttributeType: S
+        - AttributeName: PhotoId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: FamilyId
+          KeyType: HASH
+        - AttributeName: PhotoId
+          KeyType: RANGE
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      Tags:
+        - Key: Service
+          Value: FamilyCatPhotos
+
+Outputs:
+  ApiEndpoint:
+    Description: Base URL for the Family Cat Photos API.
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/${StageName}"
+  PhotoBucketName:
+    Description: Name of the S3 bucket storing cat photos.
+    Value: !Ref PhotoBucket
+  PhotoMetadataTableName:
+    Description: Name of the DynamoDB table storing photo metadata.
+    Value: !Ref PhotoMetadataTable
