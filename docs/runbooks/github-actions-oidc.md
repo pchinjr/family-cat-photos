@@ -146,8 +146,11 @@ aws iam create-open-id-connect-provider \
       "Effect": "Allow",
       "Action": [
         "lambda:CreateFunction",
+        "lambda:AddPermission",
         "lambda:DeleteFunction",
         "lambda:GetFunction",
+        "lambda:GetPolicy",
+        "lambda:RemovePermission",
         "lambda:TagResource",
         "lambda:UntagResource",
         "lambda:UpdateFunctionCode",
