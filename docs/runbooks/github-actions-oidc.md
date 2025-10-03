@@ -81,8 +81,6 @@ aws iam create-open-id-connect-provider \
         "cloudformation:ExecuteChangeSet",
         "cloudformation:GetTemplateSummary",
         "cloudformation:ListStackResources",
-        "cloudformation:TagResource",
-        "cloudformation:UntagResource",
         "cloudformation:UpdateStack"
       ],
       "Resource": [
@@ -120,7 +118,6 @@ aws iam create-open-id-connect-provider \
         "s3:PutBucketOwnershipControls",
         "s3:PutBucketPolicy",
         "s3:PutBucketPublicAccessBlock",
-        "s3:PutBucketTagging",
         "s3:PutBucketVersioning"
       ],
       "Resource": "arn:aws:s3:::family-cat-photos-photobucket-*"
@@ -133,9 +130,6 @@ aws iam create-open-id-connect-provider \
         "dynamodb:DeleteTable",
         "dynamodb:DescribeTable",
         "dynamodb:DescribeContinuousBackups",
-        "dynamodb:ListTagsOfResource",
-        "dynamodb:TagResource",
-        "dynamodb:UntagResource",
         "dynamodb:UpdateContinuousBackups",
         "dynamodb:UpdateTable"
       ],
@@ -151,8 +145,6 @@ aws iam create-open-id-connect-provider \
         "lambda:GetFunction",
         "lambda:GetPolicy",
         "lambda:RemovePermission",
-        "lambda:TagResource",
-        "lambda:UntagResource",
         "lambda:UpdateFunctionCode",
         "lambda:UpdateFunctionConfiguration"
       ],
@@ -174,8 +166,7 @@ aws iam create-open-id-connect-provider \
         "arn:aws:apigateway:us-east-1::/apis/*/routes/*",
         "arn:aws:apigateway:us-east-1::/apis/*/deployments/*",
         "arn:aws:apigateway:us-east-1::/apis/*/stages",
-        "arn:aws:apigateway:us-east-1::/apis/*/stages/*",
-        "arn:aws:apigateway:us-east-1::/tags/*"
+        "arn:aws:apigateway:us-east-1::/apis/*/stages/*"
       ]
     },
     {
@@ -194,8 +185,6 @@ aws iam create-open-id-connect-provider \
         "iam:DeleteRolePolicy",
         "iam:DetachRolePolicy",
         "iam:PutRolePolicy",
-        "iam:TagRole",
-        "iam:UntagRole",
         "iam:UpdateRole"
       ],
       "Resource": "arn:aws:iam::<ACCOUNT_ID>:role/family-cat-photos-PhotoApiFunctionRole-*"
@@ -210,7 +199,6 @@ aws iam create-open-id-connect-provider \
 }
 ```
    - Replace `<ACCOUNT_ID>` with your environment value. If you deploy in a region other than `us-east-1`, adjust the ARNs accordingly. The extra CloudFormation ARN (`aws:transform/Serverless-2016-10-31`) is required because SAM expands templates using that transform; without it you'll see `Template format error` or `not authorized to perform cloudformation:CreateChangeSet` failures. The DynamoDB ARN covers the generated table name (`family-cat-photos-PhotoMetadataTable-…`) so `DescribeTable` and related calls succeed during deploys. The photo bucket statement grants CloudFormation authority to create/update the stack-managed S3 bucket (`family-cat-photos-PhotoBucket-*`).
-   - API Gateway tagging is handled via `apigateway:POST` and `apigateway:DELETE` on `/tags/*`; AWS does not provide a separate `apigateway:TagResource` action, so the combination of method verbs and the `/tags/*` resource covers tag operations.
    - Add statements for additional resources (e.g., S3 object access policies, DynamoDB stream consumers, Parameter Store reads) as the stack grows; prefer narrow ARNs over `*`.
    - If the bucket is provisioned manually, you can remove `s3:CreateBucket` from the policy once the bucket exists.
    - If you iterate quickly, you can temporarily attach a broader policy, but plan to tighten it before production.
