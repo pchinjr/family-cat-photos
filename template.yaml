@@ -17,6 +17,7 @@ Globals:
         ALLOWED_FAMILY_IDS: !Join
           - ","
           - !Ref AllowedFamilyIds
+        STAGE_NAME: !Ref StageName
 
 Parameters:
   StageName:

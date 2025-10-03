@@ -17,6 +17,7 @@ if str(SRC_DIR) not in sys.path:
 os.environ.setdefault("PHOTO_TABLE_NAME", "PhotoTable")
 os.environ.setdefault("PHOTO_BUCKET_NAME", "PhotoBucket")
 os.environ.setdefault("ALLOWED_FAMILY_IDS", "family-123")
+os.environ.setdefault("STAGE_NAME", "dev")
 
 from handlers import photos  # noqa: E402  pylint: disable=wrong-import-position
 
@@ -176,6 +177,14 @@ def test_home_page_handles_stage_prefix():
 
     assert response["statusCode"] == 200
     assert "Sign in to see your family cats" in response["body"]
+    assert 'action="/dev/session"' in response["body"]
+
+
+def test_home_page_handles_stage_when_context_missing():
+    event = make_event("GET", "/dev")
+    response = photos.handler(event, None)
+
+    assert response["statusCode"] == 200
     assert 'action="/dev/session"' in response["body"]
 
 

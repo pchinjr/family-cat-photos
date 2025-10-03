@@ -29,6 +29,7 @@ LOGGER.setLevel(logging.INFO)
 PHOTO_TABLE_NAME = os.environ["PHOTO_TABLE_NAME"]
 PHOTO_BUCKET_NAME = os.environ["PHOTO_BUCKET_NAME"]
 _ALLOWED_IDS_RAW = os.getenv("ALLOWED_FAMILY_IDS", "").strip()
+STAGE_NAME = os.getenv("STAGE_NAME", "").strip()
 ALLOWED_FAMILY_IDS = {
     value.strip()
     for value in _ALLOWED_IDS_RAW.split(",")
@@ -202,11 +203,19 @@ def _extract_family_id(event: Dict[str, Any], form_fields: Optional[Dict[str, st
     return _validate_family_id(family_id)
 
 
-def _base_path(event: Dict[str, Any]) -> str:
+def _base_path(event: Dict[str, Any], raw_path: str) -> str:
     request_context = event.get("requestContext") or {}
-    stage = request_context.get("stage")
+    stage = (request_context.get("stage") or "").strip()
+    stage_candidates: List[str] = []
     if stage and stage != "$default":
-        return f"/{stage}".rstrip("/")
+        stage_candidates.append(stage)
+    if STAGE_NAME:
+        stage_candidates.append(STAGE_NAME)
+
+    for candidate in stage_candidates:
+        prefix = f"/{candidate}".rstrip("/")
+        if prefix and (raw_path == prefix or raw_path.startswith(prefix + "/")):
+            return prefix
     return ""
 
 
@@ -235,8 +244,8 @@ def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
     if "?" in raw_path:
         raw_path = raw_path.split("?", 1)[0]
 
-    base_path = _base_path(event)
     path = (raw_path or "/").rstrip("/") or "/"
+    base_path = _base_path(event, path)
     if base_path:
         normalized_base = base_path.rstrip("/")
         if path == normalized_base:
