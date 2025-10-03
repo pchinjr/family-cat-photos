@@ -166,7 +166,8 @@ aws iam create-open-id-connect-provider \
         "apigateway:GET",
         "apigateway:PATCH",
         "apigateway:POST",
-        "apigateway:PUT"
+        "apigateway:PUT",
+        "apigateway:TagResource"
       ],
       "Resource": [
         "arn:aws:apigateway:us-east-1::/apis*",
