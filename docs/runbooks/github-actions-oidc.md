@@ -148,6 +148,22 @@ aws iam create-open-id-connect-provider \
       "Resource": "arn:aws:iam::<ACCOUNT_ID>:role/family-cat-photos-*"
     },
     {
+      "Sid": "ManageLambdaExecutionRole",
+      "Effect": "Allow",
+      "Action": [
+        "iam:AttachRolePolicy",
+        "iam:CreateRole",
+        "iam:DeleteRole",
+        "iam:DeleteRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:PutRolePolicy",
+        "iam:TagRole",
+        "iam:UntagRole",
+        "iam:UpdateRole"
+      ],
+      "Resource": "arn:aws:iam::<ACCOUNT_ID>:role/family-cat-photos-PhotoApiFunctionRole-*"
+    },
+    {
       "Sid": "DescribeIAMRoles",
       "Effect": "Allow",
       "Action": "iam:GetRole",
