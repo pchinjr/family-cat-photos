@@ -169,11 +169,7 @@ aws iam create-open-id-connect-provider \
         "apigateway:PUT"
       ],
       "Resource": [
-        "arn:aws:apigateway:us-east-1::/apis",
-        "arn:aws:apigateway:us-east-1::/apis/*",
-        "arn:aws:apigateway:us-east-1::/apis/*/routes/*",
-        "arn:aws:apigateway:us-east-1::/apis/*/deployments/*",
-        "arn:aws:apigateway:us-east-1::/apis/*/stages/*",
+        "arn:aws:apigateway:us-east-1::/apis*",
         "arn:aws:apigateway:us-east-1::/tags/*"
       ]
     },
