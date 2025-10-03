@@ -85,7 +85,10 @@ aws iam create-open-id-connect-provider \
         "cloudformation:UntagResource",
         "cloudformation:UpdateStack"
       ],
-      "Resource": "arn:aws:cloudformation:us-east-1:837132623653:stack/family-cat-photos*"
+      "Resource": [
+        "arn:aws:cloudformation:us-east-1:837132623653:stack/family-cat-photos*",
+        "arn:aws:cloudformation:us-east-1:aws:transform/Serverless-2016-10-31"
+      ]
     },
     {
       "Sid": "ArtifactsBucket",
@@ -119,7 +122,7 @@ aws iam create-open-id-connect-provider \
   ]
 }
 ```
-   - Replace `<REGION>` and `<ACCOUNT_ID>` with your environment values. If the artifacts bucket lives in another account or uses a different name, adjust the ARN accordingly.
+   - Replace `<REGION>` and `<ACCOUNT_ID>` with your environment values. The extra CloudFormation ARN (`aws:transform/Serverless-2016-10-31`) is required because SAM expands templates using that transform; without it you'll see `Template format error` or `not authorized to perform cloudformation:CreateChangeSet` failures.
    - Add statements for additional resources (e.g., DynamoDB table exports, Parameter Store reads) as the stack grows; prefer narrow ARNs over `*`.
    - If the bucket is provisioned manually, you can remove `s3:CreateBucket` from the policy once the bucket exists.
    - If you iterate quickly, you can temporarily attach a broader policy, but plan to tighten it before production.
