@@ -77,7 +77,7 @@ Requests must include `x-family-id`. If `ALLOWED_FAMILY_IDS` is set, the header 
   - `ALLOWED_FAMILY_IDS` (comma-separated allow list passed to `AllowedFamilyIds`).
   - Repository variable `SAM_STAGE_NAME` to override the default `dev` stage name.
   - Repository variable `AWS_REGION` if deploying outside `us-east-1`.
-- Trigger deploys manually with the **Run workflow** button (`workflow_dispatch`) when needed.
+- Trigger deploys manually with the **Run workflow** button (`workflow_dispatch`) when needed; the deploy job runs when you target `main`.
 - See `docs/runbooks/github-actions-oidc.md` for setting up GitHub OIDC role assumption on AWS.
 
 ## Observability & Future Work
