@@ -1,9 +1,10 @@
 # Family Cat Photos
 
-Serverless backend for a private family photo sharing site focused on cat pictures. The MVP provides authenticated family members with presigned upload URLs, records photo metadata, and lists uploaded photos. It is deployed with AWS SAM using managed services to keep the footprint small.
+Serverless backend for a private family photo sharing site focused on cat pictures. The MVP now includes a lightweight HTML interface for family members to sign in, upload photos with a simple form, and browse the shared gallery. The backend is still deployed with AWS SAM using managed services to keep the footprint small.
 
 ## Features
 - REST-style API fronted by API Gateway HTTP API.
+- Progressive HTML front end served from the root path (`/`) using the same Lambda handler.
 - Python AWS Lambda function that issues presigned S3 upload URLs, stores metadata in DynamoDB, and lists photos for a family.
 - S3 bucket with strict public access blocking for object storage.
 - DynamoDB table for photo metadata (family + photo composite key).
@@ -18,13 +19,19 @@ Serverless backend for a private family photo sharing site focused on cat pictur
    ```
    Provide values for `StageName` and comma-delimited `AllowedFamilyIds`. Leaving `AllowedFamilyIds` empty allows any `x-family-id` header while you iterate locally.
 
-2. **Invoke locally**
+1. **Invoke locally**
    ```bash
    sam local start-api
    ```
-   Send requests with an `x-family-id` header matching your allow list.
+   Open `http://127.0.0.1:3000/` in a browser, enter your family identifier, and try the HTML forms. To exercise the JSON API directly, send requests with an `x-family-id` header matching your allow list.
 
-3. **Run tests**
+1. **Sign in to the HTML front end**
+   - Visit the root path (`/`).
+   - Enter your family identifier. The handler sets it as a secure cookie (or you can pass `?family_id=` in development).
+   - Upload a photo using the vanilla HTML form (multipart POST). Metadata is stored automatically.
+   - Uploaded photos are rendered inline using short-lived presigned links, so images remain private outside the session.
+
+1. **Run tests**
    ```bash
    pytest
    ```

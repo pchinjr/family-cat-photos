@@ -1,8 +1,9 @@
 import json
 import os
 import sys
+import urllib.parse
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Iterable, Optional
 
 import pytest
 from botocore.stub import ANY, Stubber
@@ -28,13 +29,33 @@ def reset_allowed_family_ids(monkeypatch):
     photos.ALLOWED_FAMILY_IDS = {"family-123"}
 
 
-def make_event(method: str, path: str, headers: Dict[str, str] | None = None, body: Dict | None = None):
+def make_event(
+    method: str,
+    path: str,
+    headers: Optional[Dict[str, str]] = None,
+    body: Optional[str | Dict] = None,
+    *,
+    cookies: Optional[Iterable[str]] = None,
+    query: Optional[Dict[str, str]] = None,
+    is_base64: bool = False,
+):
+    if isinstance(body, dict):
+        body_payload: Optional[str] = json.dumps(body)
+    else:
+        body_payload = body
+
+    query_params = query or None
+    raw_query = urllib.parse.urlencode(query) if query else None
+
     return {
         "requestContext": {"http": {"method": method}},
         "rawPath": path,
         "headers": headers or {},
-        "body": json.dumps(body) if body is not None else None,
-        "isBase64Encoded": False,
+        "body": body_payload,
+        "isBase64Encoded": is_base64,
+        "cookies": list(cookies) if cookies else None,
+        "queryStringParameters": query_params,
+        "rawQueryString": raw_query,
     }
 
 
@@ -132,3 +153,65 @@ def test_list_photos_returns_items():
     assert response["statusCode"] == 200
     body = json.loads(response["body"])
     assert body["items"][0]["objectKey"] == "family-123/abc.jpg"
+
+
+def test_home_page_prompts_for_family_identifier():
+    event = make_event("GET", "/")
+    response = photos.handler(event, None)
+
+    assert response["statusCode"] == 200
+    assert "text/html" in response["headers"]["Content-Type"]
+    assert "Sign in to see your family cats" in response["body"]
+
+
+def test_session_login_sets_cookie(monkeypatch):
+    event = make_event(
+        "POST",
+        "/session",
+        headers={"content-type": "application/x-www-form-urlencoded"},
+        body="family_id=family-123",
+    )
+
+    response = photos.handler(event, None)
+
+    assert response["statusCode"] == 303
+    assert "cookies" in response
+    assert any(cookie.startswith("family_id=") for cookie in response["cookies"])
+    assert response["headers"]["Location"] == "/?status=welcome"
+
+
+def test_photo_content_redirects_to_presigned_url(monkeypatch):
+    event = make_event(
+        "GET",
+        "/photos/abc/content",
+        cookies=["family_id=family-123"],
+    )
+
+    expected_get_item = {
+        "TableName": os.environ["PHOTO_TABLE_NAME"],
+        "Key": {
+            "FamilyId": {"S": "family-123"},
+            "PhotoId": {"S": "abc"},
+        },
+    }
+
+    get_item_response = {
+        "Item": {
+            "FamilyId": {"S": "family-123"},
+            "PhotoId": {"S": "abc"},
+            "ObjectKey": {"S": "family-123/abc.jpg"},
+        }
+    }
+
+    with Stubber(photos.dynamodb_client) as dynamo_stub:
+        dynamo_stub.add_response("get_item", get_item_response, expected_get_item)
+        monkeypatch.setattr(
+            photos.s3_client,
+            "generate_presigned_url",
+            lambda **kwargs: "https://example.com/download",
+        )
+
+        response = photos.handler(event, None)
+
+    assert response["statusCode"] == 302
+    assert response["headers"]["Location"] == "https://example.com/download"
