@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import base64
 import html
-import io
 import json
 import logging
 import os
@@ -203,6 +202,30 @@ def _extract_family_id(event: Dict[str, Any], form_fields: Optional[Dict[str, st
     return _validate_family_id(family_id)
 
 
+def _base_path(event: Dict[str, Any]) -> str:
+    request_context = event.get("requestContext") or {}
+    stage = request_context.get("stage")
+    if stage and stage != "$default":
+        return f"/{stage}"
+    return ""
+
+
+def _stage_path(base_path: str, relative: str) -> str:
+    relative = relative.lstrip("/")
+    if not relative:
+        return base_path or "/"
+    return f"{base_path}/{relative}" if base_path else f"/{relative}"
+
+
+def _root_path(base_path: str) -> str:
+    return base_path or "/"
+
+
+def _append_query(path: str, query: str) -> str:
+    separator = "&" if "?" in path else "?"
+    return f"{path}{separator}{query}" if query else path
+
+
 def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
     LOGGER.debug("Received event: %s", json.dumps(event))
 
@@ -210,31 +233,28 @@ def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
     method = (request_context.get("http") or {}).get("method", "")
     raw_path = event.get("rawPath", "/")
 
-    stage = request_context.get("stage")
+    base_path = _base_path(event)
     path = raw_path or "/"
-    if stage and stage != "$default":
-        stage_prefix = f"/{stage}"
-        if path == stage_prefix:
-            path = "/"
-        elif path.startswith(stage_prefix + "/"):
-            path = path[len(stage_prefix):] or "/"
+    if base_path and path.startswith(base_path):
+        trimmed = path[len(base_path):] or "/"
+        path = trimmed
 
     path = path.rstrip("/") or "/"
 
     if method == "GET" and path == "/":
-        return _handle_home(event)
+        return _handle_home(event, base_path)
 
     if method == "POST" and path == "/session":
-        return _handle_session(event)
+        return _handle_session(event, base_path)
 
     if method == "POST" and path == "/session/logout":
-        return _handle_logout(event)
+        return _handle_logout(event, base_path)
 
     if method == "POST" and path == "/photos/form-upload":
-        return _handle_form_photo_upload(event)
+        return _handle_form_photo_upload(event, base_path)
 
     if method == "GET" and path.startswith("/photos/") and path.endswith("/content"):
-        return _handle_photo_content(event, path)
+        return _handle_photo_content(event, path, base_path)
 
     if method == "GET" and path == "/health":
         return _build_response(200, {"status": "ok"})
@@ -265,29 +285,31 @@ def _cookie_attributes(event: Dict[str, Any]) -> str:
     return "; ".join(attributes)
 
 
-def _handle_session(event: Dict[str, Any]) -> Dict[str, Any]:
+def _handle_session(event: Dict[str, Any], base_path: str) -> Dict[str, Any]:
     form_fields, _ = _parse_form_data(event)
     family_id = (form_fields.get("family_id") or "").strip()
 
     try:
         valid_family = _validate_family_id(family_id)
     except PermissionError as exc:
-        html_body = _render_home_html(None, error=str(exc))
+        html_body = _render_home_html(None, error=str(exc), base_path=base_path)
         return _build_response(403, html_body, content_type=HTML_CONTENT_TYPE)
 
     cookie_value = f"family_id={urllib.parse.quote(valid_family)}; {_cookie_attributes(event)}"
-    headers = {"Location": "/?status=welcome"}
+    location = _append_query(_root_path(base_path), "status=welcome")
+    headers = {"Location": location}
     return _build_response(303, "", headers=headers, cookies=[cookie_value], content_type="text/plain")
 
 
-def _handle_logout(event: Dict[str, Any]) -> Dict[str, Any]:
+def _handle_logout(event: Dict[str, Any], base_path: str) -> Dict[str, Any]:
     expires = "Thu, 01 Jan 1970 00:00:00 GMT"
     cookie_value = f"family_id=deleted; {_cookie_attributes(event)}; Expires={expires}; Max-Age=0"
-    headers = {"Location": "/?status=goodbye"}
+    location = _append_query(_root_path(base_path), "status=goodbye")
+    headers = {"Location": location}
     return _build_response(303, "", headers=headers, cookies=[cookie_value], content_type="text/plain")
 
 
-def _handle_home(event: Dict[str, Any]) -> Dict[str, Any]:
+def _handle_home(event: Dict[str, Any], base_path: str) -> Dict[str, Any]:
     query = _parse_query_string(event)
     status = query.get("status")
     message = None
@@ -317,7 +339,13 @@ def _handle_home(event: Dict[str, Any]) -> Dict[str, Any]:
             LOGGER.error("Failed to load photos for HTML view: %s", exc)
             load_error = "Unable to load photos right now."
 
-    body = _render_home_html(family_id, message=message, error=error or load_error, photos=photos)
+    body = _render_home_html(
+        family_id,
+        message=message,
+        error=error or load_error,
+        photos=photos,
+        base_path=base_path,
+    )
     return _build_response(200, body, content_type=HTML_CONTENT_TYPE)
 
 
@@ -327,6 +355,7 @@ def _render_home_html(
     message: Optional[str] = None,
     error: Optional[str] = None,
     photos: Optional[List[Dict[str, Any]]] = None,
+    base_path: str = "",
 ) -> str:
     photos = photos or []
 
@@ -338,15 +367,16 @@ def _render_home_html(
 
     if family_id:
         welcome = f"<p class=\"welcome\">Viewing photos for <strong>{html.escape(family_id)}</strong></p>"
+        logout_action = _stage_path(base_path, "/session/logout")
         logout_form = (
-            "<form method=\"POST\" action=\"/session/logout\">"
+            f"<form method=\"POST\" action=\"{logout_action}\">"
             "<button type=\"submit\">Sign out</button>"
             "</form>"
         )
         upload_form = f"""
         <section class="panel">
           <h2>Upload a new cat photo</h2>
-          <form method="POST" action="/photos/form-upload" enctype="multipart/form-data">
+          <form method="POST" action="{_stage_path(base_path, '/photos/form-upload')}" enctype="multipart/form-data">
             <input type="hidden" name="family_id" value="{html.escape(family_id)}">
             <label>Photo file
               <input type="file" name="photo" accept="image/*" required>
@@ -370,7 +400,10 @@ def _render_home_html(
                 title = html.escape(item.get("title") or "Untitled cat photo")
                 description = html.escape(item.get("description") or "")
                 uploaded_at = html.escape(item.get("uploadedAt") or "")
-                content_url = f"/photos/{urllib.parse.quote(item['photoId'])}/content"
+                content_url = _stage_path(
+                    base_path,
+                    f"/photos/{urllib.parse.quote(item['photoId'])}/content",
+                )
                 gallery_items.append(
                     f"<figure>\n"
                     f"  <img src=\"{content_url}\" alt=\"{title}\" loading=\"lazy\" referrerpolicy=\"no-referrer\">\n"
@@ -404,18 +437,19 @@ def _render_home_html(
             gallery=gallery,
         )
     else:
+        login_action = _stage_path(base_path, "/session")
         login_form = """
         <section class="panel">
           {alerts}
           <h2>Sign in to see your family cats</h2>
-          <form method="POST" action="/session">
+          <form method="POST" action="{login_action}">
             <label>Family identifier
               <input type="text" name="family_id" required autofocus>
             </label>
             <button type="submit">Continue</button>
           </form>
         </section>
-        """.format(alerts="".join(alerts))
+        """.format(alerts="".join(alerts), login_action=login_action)
         body = "<main>" + login_form + "</main>"
 
     return """
@@ -456,18 +490,22 @@ def _render_home_html(
     """.strip().format(body=body)
 
 
-def _handle_form_photo_upload(event: Dict[str, Any]) -> Dict[str, Any]:
+def _handle_form_photo_upload(event: Dict[str, Any], base_path: str) -> Dict[str, Any]:
     form_fields, files = _parse_form_data(event)
 
     try:
         family_id = _extract_family_id(event, form_fields=form_fields)
     except PermissionError as exc:
-        html_body = _render_home_html(None, error=str(exc))
+        html_body = _render_home_html(None, error=str(exc), base_path=base_path)
         return _build_response(403, html_body, content_type=HTML_CONTENT_TYPE)
 
     file_field = files.get("photo")
     if not file_field or not file_field.get("data"):
-        html_body = _render_home_html(family_id, error="Please choose an image to upload")
+        html_body = _render_home_html(
+            family_id,
+            error="Please choose an image to upload",
+            base_path=base_path,
+        )
         return _build_response(400, html_body, content_type=HTML_CONTENT_TYPE)
 
     title = (form_fields.get("title") or "").strip() or None
@@ -491,7 +529,11 @@ def _handle_form_photo_upload(event: Dict[str, Any]) -> Dict[str, Any]:
         )
     except ClientError as exc:
         LOGGER.error("Failed to upload photo object: %s", exc)
-        html_body = _render_home_html(family_id, error="Could not store the photo. Please try again.")
+        html_body = _render_home_html(
+            family_id,
+            error="Could not store the photo. Please try again.",
+            base_path=base_path,
+        )
         return _build_response(500, html_body, content_type=HTML_CONTENT_TYPE)
 
     try:
@@ -505,18 +547,22 @@ def _handle_form_photo_upload(event: Dict[str, Any]) -> Dict[str, Any]:
             taken_at=taken_at,
         )
     except PermissionError as exc:
-        html_body = _render_home_html(family_id, error=str(exc))
+        html_body = _render_home_html(family_id, error=str(exc), base_path=base_path)
         return _build_response(403, html_body, content_type=HTML_CONTENT_TYPE)
     except ClientError as exc:
         LOGGER.error("Failed to record photo metadata: %s", exc)
-        html_body = _render_home_html(family_id, error="Unable to save photo details.")
+        html_body = _render_home_html(
+            family_id,
+            error="Unable to save photo details.",
+            base_path=base_path,
+        )
         return _build_response(500, html_body, content_type=HTML_CONTENT_TYPE)
 
-    headers = {"Location": "/?status=uploaded"}
+    headers = {"Location": _append_query(_root_path(base_path), "status=uploaded")}
     return _build_response(303, "", headers=headers, content_type="text/plain")
 
 
-def _handle_photo_content(event: Dict[str, Any], path: str) -> Dict[str, Any]:
+def _handle_photo_content(event: Dict[str, Any], path: str, base_path: str) -> Dict[str, Any]:
     segments = [segment for segment in path.split("/") if segment]
     if len(segments) < 3:
         return _build_response(404, {"message": "Not Found"})
@@ -525,7 +571,8 @@ def _handle_photo_content(event: Dict[str, Any], path: str) -> Dict[str, Any]:
     try:
         family_id = _extract_family_id(event)
     except PermissionError:
-        return _build_response(302, "", headers={"Location": "/"}, content_type="text/plain")
+        headers = {"Location": _root_path(base_path)}
+        return _build_response(302, "", headers=headers, content_type="text/plain")
 
     try:
         item = dynamodb_client.get_item(

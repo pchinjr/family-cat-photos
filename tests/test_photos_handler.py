@@ -167,6 +167,7 @@ def test_home_page_prompts_for_family_identifier():
     assert response["statusCode"] == 200
     assert "text/html" in response["headers"]["Content-Type"]
     assert "Sign in to see your family cats" in response["body"]
+    assert 'action="/session"' in response["body"]
 
 
 def test_home_page_handles_stage_prefix():
@@ -175,6 +176,7 @@ def test_home_page_handles_stage_prefix():
 
     assert response["statusCode"] == 200
     assert "Sign in to see your family cats" in response["body"]
+    assert 'action="/dev/session"' in response["body"]
 
 
 def test_session_login_sets_cookie(monkeypatch):
@@ -191,6 +193,22 @@ def test_session_login_sets_cookie(monkeypatch):
     assert "cookies" in response
     assert any(cookie.startswith("family_id=") for cookie in response["cookies"])
     assert response["headers"]["Location"] == "/?status=welcome"
+
+
+def test_session_login_with_stage_sets_cookie(monkeypatch):
+    event = make_event(
+        "POST",
+        "/dev/session",
+        headers={"content-type": "application/x-www-form-urlencoded"},
+        body="family_id=family-123",
+        stage="dev",
+    )
+
+    response = photos.handler(event, None)
+
+    assert response["statusCode"] == 303
+    assert any(cookie.startswith("family_id=") for cookie in response.get("cookies", []))
+    assert response["headers"]["Location"] == "/dev?status=welcome"
 
 
 def test_photo_content_redirects_to_presigned_url(monkeypatch):
