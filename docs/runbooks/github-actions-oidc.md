@@ -142,6 +142,20 @@ aws iam create-open-id-connect-provider \
       "Resource": "arn:aws:dynamodb:us-east-1:<ACCOUNT_ID>:table/family-cat-photos-PhotoMetadataTable*"
     },
     {
+      "Sid": "LambdaFunctions",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:CreateFunction",
+        "lambda:DeleteFunction",
+        "lambda:GetFunction",
+        "lambda:TagResource",
+        "lambda:UntagResource",
+        "lambda:UpdateFunctionCode",
+        "lambda:UpdateFunctionConfiguration"
+      ],
+      "Resource": "arn:aws:lambda:us-east-1:<ACCOUNT_ID>:function:family-cat-photos-PhotoApiFunction*"
+    },
+    {
       "Sid": "PassExecutionRole",
       "Effect": "Allow",
       "Action": "iam:PassRole",
