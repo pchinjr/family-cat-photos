@@ -12,6 +12,12 @@ from typing import Any, Dict, Optional
 import boto3
 from botocore.exceptions import ClientError
 
+AWS_REGION = (
+    os.getenv("AWS_REGION")
+    or os.getenv("AWS_DEFAULT_REGION")
+    or "us-east-1"
+)
+
 LOGGER = logging.getLogger()
 LOGGER.setLevel(logging.INFO)
 
@@ -24,8 +30,8 @@ ALLOWED_FAMILY_IDS = {
     if value.strip()
 }
 
-s3_client = boto3.client("s3")
-dynamodb_client = boto3.client("dynamodb")
+s3_client = boto3.client("s3", region_name=AWS_REGION)
+dynamodb_client = boto3.client("dynamodb", region_name=AWS_REGION)
 
 UPLOAD_URL_TTL_SECONDS = 15 * 60  # 15 minutes
 

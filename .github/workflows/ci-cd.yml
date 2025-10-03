@@ -72,6 +72,9 @@ jobs:
       - name: Set up SAM CLI
         uses: aws-actions/setup-sam@v2
 
+      - name: Install AWS CLI
+        uses: aws-actions/setup-aws-cli@v2
+
       - name: Configure AWS credentials (assume role)
         if: secrets.AWS_DEPLOY_ROLE_ARN != ''
         uses: aws-actions/configure-aws-credentials@v4
