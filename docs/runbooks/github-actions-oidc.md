@@ -166,7 +166,9 @@ aws iam create-open-id-connect-provider \
         "apigateway:GET",
         "apigateway:PATCH",
         "apigateway:POST",
-        "apigateway:PUT"
+        "apigateway:PUT",
+        "apigateway:TagResource",
+        "apigateway:UntagResource"
       ],
       "Resource": [
         "arn:aws:apigateway:us-east-1::/apis",
@@ -210,7 +212,16 @@ aws iam create-open-id-connect-provider \
 }
 ```
    - Replace `<ACCOUNT_ID>` with your environment value. If you deploy in a region other than `us-east-1`, adjust the ARNs accordingly. The extra CloudFormation ARN (`aws:transform/Serverless-2016-10-31`) is required because SAM expands templates using that transform; without it you'll see `Template format error` or `not authorized to perform cloudformation:CreateChangeSet` failures. The DynamoDB ARN covers the generated table name (`family-cat-photos-PhotoMetadataTable-…`) so `DescribeTable` and related calls succeed during deploys. The photo bucket statement grants CloudFormation authority to create/update the stack-managed S3 bucket (`family-cat-photos-PhotoBucket-*`).
-   - CloudFormation and SAM automatically apply both AWS-managed and stack-level tags to created resources; AWS does not provide a mechanism to disable these system tags, so the policy must include the tag permissions above even if the template itself does not set any tags.
+   - CloudFormation and SAM automatically apply both AWS-managed and stack-level tags to created resources; AWS does not provide a mechanism to disable these system tags, so the policy must include the tag permissions above even if the template itself does not set any tags. API Gateway exposes tagging through dedicated `apigateway:TagResource`/`apigateway:UntagResource` actions even though the IAM console’s visual/editor validation may flag them as “invalid.” When that happens, define or update the policy via the AWS CLI:
+
+```bash
+aws iam put-role-policy \
+  --role-name family-cat-photos-deploy \
+  --policy-name sam-deploy \
+  --policy-document file://deploy-policy.json
+```
+
+   - Add statements for additional resources (e.g., S3 object access policies, DynamoDB stream consumers, Parameter Store reads) as the stack grows; prefer narrow ARNs over `*`.
    - Add statements for additional resources (e.g., S3 object access policies, DynamoDB stream consumers, Parameter Store reads) as the stack grows; prefer narrow ARNs over `*`.
    - If the bucket is provisioned manually, you can remove `s3:CreateBucket` from the policy once the bucket exists.
    - If you iterate quickly, you can temporarily attach a broader policy, but plan to tighten it before production.
