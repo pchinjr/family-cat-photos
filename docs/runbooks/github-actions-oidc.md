@@ -116,7 +116,7 @@ aws iam create-open-id-connect-provider \
         "s3:GetBucketLocation",
         "s3:ListBucket",
         "s3:PutBucketAcl",
-        "s3:PutBucketEncryption",
+        "s3:PutEncryptionConfiguration",
         "s3:PutBucketOwnershipControls",
         "s3:PutBucketPolicy",
         "s3:PutBucketPublicAccessBlock",
