@@ -156,6 +156,26 @@ aws iam create-open-id-connect-provider \
       "Resource": "arn:aws:lambda:us-east-1:<ACCOUNT_ID>:function:family-cat-photos-PhotoApiFunction*"
     },
     {
+      "Sid": "HttpApi",
+      "Effect": "Allow",
+      "Action": [
+        "apigateway:DELETE",
+        "apigateway:GET",
+        "apigateway:PATCH",
+        "apigateway:POST",
+        "apigateway:PUT",
+        "apigateway:TagResource",
+        "apigateway:UntagResource"
+      ],
+      "Resource": [
+        "arn:aws:apigateway:us-east-1::/apis/*",
+        "arn:aws:apigateway:us-east-1::/apis/*/routes/*",
+        "arn:aws:apigateway:us-east-1::/apis/*/deployments/*",
+        "arn:aws:apigateway:us-east-1::/apis/*/stages/*",
+        "arn:aws:apigateway:us-east-1::/tags/*"
+      ]
+    },
+    {
       "Sid": "PassExecutionRole",
       "Effect": "Allow",
       "Action": "iam:PassRole",
