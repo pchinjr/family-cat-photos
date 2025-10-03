@@ -206,9 +206,20 @@ def _extract_family_id(event: Dict[str, Any], form_fields: Optional[Dict[str, st
 def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
     LOGGER.debug("Received event: %s", json.dumps(event))
 
-    method = (event.get("requestContext") or {}).get("http", {}).get("method", "")
+    request_context = event.get("requestContext") or {}
+    method = (request_context.get("http") or {}).get("method", "")
     raw_path = event.get("rawPath", "/")
-    path = raw_path.rstrip("/") or "/"
+
+    stage = request_context.get("stage")
+    path = raw_path or "/"
+    if stage and stage != "$default":
+        stage_prefix = f"/{stage}"
+        if path == stage_prefix:
+            path = "/"
+        elif path.startswith(stage_prefix + "/"):
+            path = path[len(stage_prefix):] or "/"
+
+    path = path.rstrip("/") or "/"
 
     if method == "GET" and path == "/":
         return _handle_home(event)

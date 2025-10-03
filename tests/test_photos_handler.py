@@ -38,6 +38,7 @@ def make_event(
     cookies: Optional[Iterable[str]] = None,
     query: Optional[Dict[str, str]] = None,
     is_base64: bool = False,
+    stage: Optional[str] = None,
 ):
     if isinstance(body, dict):
         body_payload: Optional[str] = json.dumps(body)
@@ -47,8 +48,12 @@ def make_event(
     query_params = query or None
     raw_query = urllib.parse.urlencode(query) if query else None
 
+    request_context = {"http": {"method": method}}
+    if stage:
+        request_context["stage"] = stage
+
     return {
-        "requestContext": {"http": {"method": method}},
+        "requestContext": request_context,
         "rawPath": path,
         "headers": headers or {},
         "body": body_payload,
@@ -161,6 +166,14 @@ def test_home_page_prompts_for_family_identifier():
 
     assert response["statusCode"] == 200
     assert "text/html" in response["headers"]["Content-Type"]
+    assert "Sign in to see your family cats" in response["body"]
+
+
+def test_home_page_handles_stage_prefix():
+    event = make_event("GET", "/dev", stage="dev")
+    response = photos.handler(event, None)
+
+    assert response["statusCode"] == 200
     assert "Sign in to see your family cats" in response["body"]
 
 
