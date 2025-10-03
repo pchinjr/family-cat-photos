@@ -92,9 +92,6 @@ Resources:
           KeyType: RANGE
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
-      Tags:
-        - Key: Service
-          Value: FamilyCatPhotos
 
 Outputs:
   ApiEndpoint:
