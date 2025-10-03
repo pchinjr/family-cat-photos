@@ -35,7 +35,7 @@ aws iam create-open-id-connect-provider \
     {
       "Effect": "Allow",
       "Principal": {
-        "Federated": "arn:aws:iam::837132623653:oidc-provider/token.actions.githubusercontent.com"
+        "Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com"
       },
       "Action": "sts:AssumeRoleWithWebIdentity",
       "Condition": {
@@ -52,15 +52,15 @@ aws iam create-open-id-connect-provider \
 ```
    - Restrict `sub` to `ref:refs/heads/main` so only the `main` branch deploys. Add entries (comma-separated array) for other branches or tags if needed.
 4. Attach a permissions policy that allows SAM deployments. Avoid wildcard permissions—scope actions and resources to this stack.
-   - **Recommended**: create a dedicated artifacts bucket once (e.g., `family-cat-photos-artifacts-<account-id>`). Example CLI (run in your AWS environment; not executed here):
+   - **Recommended**: create a dedicated artifacts bucket once (pattern: `family-cat-photos-artifacts-<account-id>`). Example CLI (run in your AWS environment; not executed here):
      ```bash
      ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
      SAM_ARTIFACT_BUCKET="family-cat-photos-artifacts-${ACCOUNT_ID}"
      aws s3 mb "s3://${SAM_ARTIFACT_BUCKET}"
      ```
      Alternatively, create the bucket from the S3 console with the same naming scheme. Remember bucket names are globally unique; adjust if the name is taken.
-     For account `837132623653`, this project uses `family-cat-photos-artifacts-837132623653` in `us-east-1` and the bucket has already been provisioned.
-   - Update GitHub repository variables: set `SAM_ARTIFACT_BUCKET` to the exact bucket name if you need to override the default. The repository’s `samconfig.toml` is already configured to use `family-cat-photos-artifacts-837132623653`.
+     > **Project note**: For account `837132623653`, the shared bucket is `family-cat-photos-artifacts-837132623653` in `us-east-1`, and `samconfig.toml` already references it.
+   - Update GitHub repository variables: set `SAM_ARTIFACT_BUCKET` to the exact bucket name only if you need to override the default.
    - If you prefer SAM to create and manage its own bucket (`--resolve-s3`), broaden the S3 resource ARNs below to match the managed bucket naming pattern (`aws-sam-cli-managed-default-samclisourcebucket-*`).
    - A starter inline policy (replace placeholders) is:
 ```json
@@ -86,7 +86,7 @@ aws iam create-open-id-connect-provider \
         "cloudformation:UpdateStack"
       ],
       "Resource": [
-        "arn:aws:cloudformation:us-east-1:837132623653:stack/family-cat-photos*",
+        "arn:aws:cloudformation:us-east-1:<ACCOUNT_ID>:stack/family-cat-photos*",
         "arn:aws:cloudformation:us-east-1:aws:transform/Serverless-2016-10-31"
       ]
     },
@@ -103,26 +103,26 @@ aws iam create-open-id-connect-provider \
         "s3:PutObject"
       ],
       "Resource": [
-        "arn:aws:s3:::family-cat-photos-artifacts-837132623653",
-        "arn:aws:s3:::family-cat-photos-artifacts-837132623653/*"
+        "arn:aws:s3:::family-cat-photos-artifacts-<ACCOUNT_ID>",
+        "arn:aws:s3:::family-cat-photos-artifacts-<ACCOUNT_ID>/*"
       ]
     },
     {
       "Sid": "PassExecutionRole",
       "Effect": "Allow",
       "Action": "iam:PassRole",
-      "Resource": "arn:aws:iam::837132623653:role/family-cat-photos-*"
+      "Resource": "arn:aws:iam::<ACCOUNT_ID>:role/family-cat-photos-*"
     },
     {
       "Sid": "DescribeIAMRoles",
       "Effect": "Allow",
       "Action": "iam:GetRole",
-      "Resource": "arn:aws:iam::837132623653:role/family-cat-photos-*"
+      "Resource": "arn:aws:iam::<ACCOUNT_ID>:role/family-cat-photos-*"
     }
   ]
 }
 ```
-   - Replace `<REGION>` and `<ACCOUNT_ID>` with your environment values. The extra CloudFormation ARN (`aws:transform/Serverless-2016-10-31`) is required because SAM expands templates using that transform; without it you'll see `Template format error` or `not authorized to perform cloudformation:CreateChangeSet` failures.
+   - Replace `<ACCOUNT_ID>` with your environment value. If you deploy in a region other than `us-east-1`, adjust the ARNs accordingly. The extra CloudFormation ARN (`aws:transform/Serverless-2016-10-31`) is required because SAM expands templates using that transform; without it you'll see `Template format error` or `not authorized to perform cloudformation:CreateChangeSet` failures.
    - Add statements for additional resources (e.g., DynamoDB table exports, Parameter Store reads) as the stack grows; prefer narrow ARNs over `*`.
    - If the bucket is provisioned manually, you can remove `s3:CreateBucket` from the policy once the bucket exists.
    - If you iterate quickly, you can temporarily attach a broader policy, but plan to tighten it before production.
@@ -150,7 +150,7 @@ aws iam put-role-policy \
     - `AWS_REGION` (defaults to `us-east-1`).
     - `SAM_STAGE_NAME` (defaults to `dev`).
  4. Optionally add `ALLOWED_FAMILY_IDS` as a secret to pass the family allow-list at deploy time.
-  5. **Composite action limitation**: GitHub composite actions cannot read `secrets.*` directly. The workflow exports secrets into environment variables (`AWS_DEPLOY_ROLE_ARN`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) before invoking any composite steps. If you introduce additional composites, pass required secrets via `env` or `with` inputs from the calling workflow.
+5. **Composite action limitation**: GitHub composite actions cannot read `secrets.*` directly. The workflow exports secrets into environment variables (`AWS_DEPLOY_ROLE_ARN`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) before invoking any composite steps. If you introduce additional composites, pass required secrets via `env` or `with` inputs from the calling workflow.
 
 ## 4. Verify Workflow Usage
 The deploy job in `.github/workflows/ci-cd.yml` automatically picks up `AWS_DEPLOY_ROLE_ARN` and configures credentials via the OIDC provider. On the first push to `main`:
