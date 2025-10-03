@@ -4,6 +4,9 @@ version = 0.1
 [default.global]
 stack_name = "family-cat-photos"
 
+[default.global.parameters]
+region = "us-east-1"
+
 [default.deploy]
 [default.deploy.parameters]
 capabilities = ["CAPABILITY_IAM"]
