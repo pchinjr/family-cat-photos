@@ -25,8 +25,8 @@ Parameters:
     AllowedPattern: "[a-z0-9-]+"
     Description: Deployment stage name used for API and resource naming.
   AllowedFamilyIds:
-    Type: List<String>
-    Default: []
+    Type: CommaDelimitedList
+    Default: ""
     Description: >-
       Comma separated list of family identifiers allowed to access the API. Leave empty to accept any identifier.
 
