@@ -108,6 +108,22 @@ aws iam create-open-id-connect-provider \
       ]
     },
     {
+      "Sid": "DynamoDb",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:CreateTable",
+        "dynamodb:DeleteTable",
+        "dynamodb:DescribeTable",
+        "dynamodb:DescribeContinuousBackups",
+        "dynamodb:ListTagsOfResource",
+        "dynamodb:TagResource",
+        "dynamodb:UntagResource",
+        "dynamodb:UpdateContinuousBackups",
+        "dynamodb:UpdateTable"
+      ],
+      "Resource": "arn:aws:dynamodb:us-east-1:<ACCOUNT_ID>:table/family-cat-photos-PhotoMetadataTable*"
+    },
+    {
       "Sid": "PassExecutionRole",
       "Effect": "Allow",
       "Action": "iam:PassRole",
@@ -122,8 +138,8 @@ aws iam create-open-id-connect-provider \
   ]
 }
 ```
-   - Replace `<ACCOUNT_ID>` with your environment value. If you deploy in a region other than `us-east-1`, adjust the ARNs accordingly. The extra CloudFormation ARN (`aws:transform/Serverless-2016-10-31`) is required because SAM expands templates using that transform; without it you'll see `Template format error` or `not authorized to perform cloudformation:CreateChangeSet` failures.
-   - Add statements for additional resources (e.g., DynamoDB table exports, Parameter Store reads) as the stack grows; prefer narrow ARNs over `*`.
+   - Replace `<ACCOUNT_ID>` with your environment value. If you deploy in a region other than `us-east-1`, adjust the ARNs accordingly. The extra CloudFormation ARN (`aws:transform/Serverless-2016-10-31`) is required because SAM expands templates using that transform; without it you'll see `Template format error` or `not authorized to perform cloudformation:CreateChangeSet` failures. The DynamoDB ARN covers the generated table name (`family-cat-photos-PhotoMetadataTable-…`) so `DescribeTable` and related calls succeed during deploys.
+   - Add statements for additional resources (e.g., DynamoDB stream consumers, Parameter Store reads) as the stack grows; prefer narrow ARNs over `*`.
    - If the bucket is provisioned manually, you can remove `s3:CreateBucket` from the policy once the bucket exists.
    - If you iterate quickly, you can temporarily attach a broader policy, but plan to tighten it before production.
 5. Finish creation and note the role ARN (e.g., `arn:aws:iam::123456789012:role/family-cat-photos-deploy`).
