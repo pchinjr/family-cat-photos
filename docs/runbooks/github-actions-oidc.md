@@ -140,13 +140,14 @@ aws iam put-role-policy \
   --policy-document file://$PERMISSIONS_FILE
 ```
 
-## 3. Configure GitHub Secrets and Variables
-1. In the GitHub repository, open **Settings → Secrets and variables → Actions**.
-2. Under **Secrets**, add `AWS_DEPLOY_ROLE_ARN` with the role ARN from AWS.
-3. Under **Variables**, add any optional overrides:
-   - `AWS_REGION` (defaults to `us-east-1`).
-   - `SAM_STAGE_NAME` (defaults to `dev`).
-4. Optionally add `ALLOWED_FAMILY_IDS` as a secret to pass the family allow-list at deploy time.
+ ## 3. Configure GitHub Secrets and Variables
+ 1. In the GitHub repository, open **Settings → Secrets and variables → Actions**.
+ 2. Under **Secrets**, add `AWS_DEPLOY_ROLE_ARN` with the role ARN from AWS.
+ 3. Under **Variables**, add any optional overrides:
+    - `AWS_REGION` (defaults to `us-east-1`).
+    - `SAM_STAGE_NAME` (defaults to `dev`).
+ 4. Optionally add `ALLOWED_FAMILY_IDS` as a secret to pass the family allow-list at deploy time.
+  5. **Composite action limitation**: GitHub composite actions cannot read `secrets.*` directly. The workflow exports secrets into environment variables (`AWS_DEPLOY_ROLE_ARN`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) before invoking any composite steps. If you introduce additional composites, pass required secrets via `env` or `with` inputs from the calling workflow.
 
 ## 4. Verify Workflow Usage
 The deploy job in `.github/workflows/ci-cd.yml` automatically picks up `AWS_DEPLOY_ROLE_ARN` and configures credentials via the OIDC provider. On the first push to `main`:
