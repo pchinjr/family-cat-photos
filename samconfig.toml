@@ -6,12 +6,11 @@ stack_name = "family-cat-photos"
 
 [default.deploy]
 [default.deploy.parameters]
-resolve_s3 = true
 capabilities = ["CAPABILITY_IAM"]
 confirm_changeset = true
 fail_on_empty_changeset = true
+s3_bucket = "family-cat-photos-artifacts-837132623653"
 s3_prefix = "family-cat-photos"
 
 [default.build.parameters]
 use_container = false
-

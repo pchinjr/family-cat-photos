@@ -1,0 +1,132 @@
+name: CI/CD
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  test:
+    name: Test & Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Set up SAM CLI
+        uses: aws-actions/setup-sam@v2
+
+      - name: Run unit tests
+        run: pytest -q
+
+      - name: Validate SAM template
+        run: sam validate --config-file samconfig.toml
+
+      - name: Build application
+        run: sam build --config-file samconfig.toml --cached
+
+  deploy:
+    name: Deploy
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+      SAM_STACK_NAME: ${{ vars.SAM_STACK_NAME || 'family-cat-photos' }}
+      SAM_STAGE_NAME: ${{ vars.SAM_STAGE_NAME || 'dev' }}
+      ALLOWED_FAMILY_IDS: ${{ secrets.ALLOWED_FAMILY_IDS || '' }}
+      SAM_ARTIFACT_BUCKET: ${{ vars.SAM_ARTIFACT_BUCKET || '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Set up SAM CLI
+        uses: aws-actions/setup-sam@v2
+
+      - name: Configure AWS credentials (assume role)
+        if: secrets.AWS_DEPLOY_ROLE_ARN != ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          role-session-name: family-cat-photos-deploy
+
+      - name: Configure AWS credentials (access keys)
+        if: secrets.AWS_DEPLOY_ROLE_ARN == '' && secrets.AWS_ACCESS_KEY_ID != '' && secrets.AWS_SECRET_ACCESS_KEY != ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Verify AWS identity
+        run: |
+          if ! aws sts get-caller-identity >/dev/null 2>&1; then
+            echo "AWS credentials are not configured. Set AWS_DEPLOY_ROLE_ARN or AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY secrets."
+            exit 1
+          fi
+
+      - name: Install dependencies for build
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Build application
+        run: sam build --config-file samconfig.toml --cached
+
+      - name: Deploy stack
+        env:
+          AWS_REGION: ${{ env.AWS_REGION }}
+          SAM_STACK_NAME: ${{ env.SAM_STACK_NAME }}
+          SAM_STAGE_NAME: ${{ env.SAM_STAGE_NAME }}
+          ALLOWED_FAMILY_IDS: ${{ env.ALLOWED_FAMILY_IDS }}
+          SAM_ARTIFACT_BUCKET: ${{ env.SAM_ARTIFACT_BUCKET }}
+        run: |
+          set -euo pipefail
+          deploy_args=(
+            --config-file samconfig.toml
+            --stack-name "$SAM_STACK_NAME"
+            --no-confirm-changeset
+            --fail-on-empty-changeset
+            --parameter-overrides "StageName=$SAM_STAGE_NAME"
+          )
+          if [ -n "${SAM_ARTIFACT_BUCKET}" ]; then
+            deploy_args+=("--s3-bucket" "$SAM_ARTIFACT_BUCKET")
+          fi
+          if [ -n "${ALLOWED_FAMILY_IDS}" ]; then
+            deploy_args+=("AllowedFamilyIds=$ALLOWED_FAMILY_IDS")
+          fi
+          sam deploy "${deploy_args[@]}"
+
+      - name: Publish deployment outputs
+        if: success()
+        run: sam list stack-outputs --stack-name "$SAM_STACK_NAME"

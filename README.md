@@ -65,6 +65,21 @@ Requests must include `x-family-id`. If `ALLOWED_FAMILY_IDS` is set, the header 
 - Update relevant ADRs or create new ones with architectural-impacting decisions.
 - Document API or deployment changes in the README to keep family members supported.
 
+## CI/CD Pipeline
+- GitHub Actions workflow (`.github/workflows/ci-cd.yml`) runs on pull requests and pushes to `main`.
+- Jobs execute `pytest`, `sam validate`, and `sam build` to keep the template healthy.
+- Deployments from `main` call `sam deploy` with parameters from repository/environment variables.
+- Configure repository **Secrets** for one of:
+  - `AWS_DEPLOY_ROLE_ARN` (preferred OIDC role assumption), or
+  - `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` for an IAM user with SAM permissions.
+- SAM deploys use dedicated artifacts bucket `family-cat-photos-artifacts-837132623653` (pre-provisioned in `us-east-1` via `samconfig.toml`). Set repository variable `SAM_ARTIFACT_BUCKET` only if you need to override this default.
+- Optional Secrets/Variables:
+  - `ALLOWED_FAMILY_IDS` (comma-separated allow list passed to `AllowedFamilyIds`).
+  - Repository variable `SAM_STAGE_NAME` to override the default `dev` stage name.
+  - Repository variable `AWS_REGION` if deploying outside `us-east-1`.
+- Trigger deploys manually with the **Run workflow** button (`workflow_dispatch`) when needed.
+- See `docs/runbooks/github-actions-oidc.md` for setting up GitHub OIDC role assumption on AWS.
+
 ## Observability & Future Work
 - Add CloudWatch dashboards and alarms for upload rate anomalies and DynamoDB throttles.
 - Integrate Amazon Cognito for authenticated family login flows.

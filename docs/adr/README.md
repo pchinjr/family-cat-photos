@@ -7,3 +7,8 @@ We capture architecture-impacting decisions in lightweight ADRs. When making a c
 3. Reference the ADR in pull requests and update when decisions are superseded.
 
 Keep ADRs small, focused, and action-oriented so the family team can understand why choices were made.
+
+## Index
+
+- [0001. Initial Serverless Architecture](0001-initial-architecture.md)
+- [0002. GitHub Actions CI/CD Pipeline](0002-ci-cd-pipeline.md)
