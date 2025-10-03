@@ -206,7 +206,7 @@ def _base_path(event: Dict[str, Any]) -> str:
     request_context = event.get("requestContext") or {}
     stage = request_context.get("stage")
     if stage and stage != "$default":
-        return f"/{stage}"
+        return f"/{stage}".rstrip("/")
     return ""
 
 
@@ -232,12 +232,18 @@ def handler(event: Dict[str, Any], _context: Any) -> Dict[str, Any]:
     request_context = event.get("requestContext") or {}
     method = (request_context.get("http") or {}).get("method", "")
     raw_path = event.get("rawPath", "/")
+    if "?" in raw_path:
+        raw_path = raw_path.split("?", 1)[0]
 
     base_path = _base_path(event)
-    path = raw_path or "/"
-    if base_path and path.startswith(base_path):
-        trimmed = path[len(base_path):] or "/"
-        path = trimmed
+    path = (raw_path or "/").rstrip("/") or "/"
+    if base_path:
+        normalized_base = base_path.rstrip("/")
+        if path == normalized_base:
+            path = "/"
+        elif path.startswith(normalized_base + "/"):
+            trimmed = path[len(normalized_base):] or "/"
+            path = trimmed
 
     path = path.rstrip("/") or "/"
 

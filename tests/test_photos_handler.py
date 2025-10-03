@@ -179,6 +179,14 @@ def test_home_page_handles_stage_prefix():
     assert 'action="/dev/session"' in response["body"]
 
 
+def test_home_page_handles_stage_with_query():
+    event = make_event("GET", "/dev", stage="dev", query={"status": "welcome"})
+    response = photos.handler(event, None)
+
+    assert response["statusCode"] == 200
+    assert "Sign in to see your family cats" in response["body"]
+
+
 def test_session_login_sets_cookie(monkeypatch):
     event = make_event(
         "POST",
